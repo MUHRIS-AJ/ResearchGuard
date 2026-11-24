@@ -1,0 +1,2 @@
+# Optional MCP tool hosting. CLI and local browser dashboard use only Python standard library.
+fastmcp>=3,<5
