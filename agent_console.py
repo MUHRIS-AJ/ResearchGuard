@@ -113,15 +113,15 @@ code{font-size:11px;color:#d9b3ff}
 </section>
 <section class="panel stretch" aria-labelledby="costTitle"><div class="topline"><div><h2 id="costTitle">Usage, API cost & billing</h2><p class="panelSub">Real token counts from Gateway responses; standard model-list prices determine the estimate. Provider invoice amounts may differ.</p></div><span class="tinyTag">USD / CURRENT SESSION</span></div>
 <div class="stats">
-<div class="stat"><span>MODEL</span><strong style="font-size:15px">Gemini 2.5 Flash Lite</strong><small>Vercel AI Gateway</small></div>
-<div class="stat"><span>INPUT PRICE</span><strong style="font-size:17px">$0.10 / 1M</strong><small>Standard tier · 2026-11-24</small></div>
-<div class="stat"><span>OUTPUT PRICE</span><strong style="font-size:17px">$0.40 / 1M</strong><small>Standard tier · 2026-11-24</small></div>
+<div class="stat"><span>MODEL</span><strong style="font-size:15px" id="modelValue">Checking configuration…</strong><small>Vercel AI Gateway</small></div>
+<div class="stat"><span>INPUT PRICE</span><strong style="font-size:17px" id="inputRate">$0.10 / 1M</strong><small>Published reference price · 2026-11-24</small></div>
+<div class="stat"><span>OUTPUT PRICE</span><strong style="font-size:17px" id="outputRate">$0.40 / 1M</strong><small>Published reference price · 2026-11-24</small></div>
 <div class="stat"><span>PER-RUN ESTIMATE LIMIT</span><strong style="font-size:19px">$0.01</strong><small>Software guardrail; not a billing cap</small></div>
 </div>
 <div class="ledger" id="ledger"><div class="ledgerRow header"><span>AGENT</span><span>TOKENS IN / OUT</span><span>ESTIMATED USD</span></div><p class="notes">No AI model requests yet in this browser session.</p></div>
 <div class="meter" aria-label="Estimate vs per-run limit"><i id="meterFill"></i></div>
-<p class="notes">An operator token and configured AI Gateway access are required for model calls. Session totals reset when this page is reloaded. A $0 estimate is never presented as actual Vercel billing. The official Vercel AI Gateway account is the source of truth for invoices and credit balances.</p>
-<div class="topline"><a class="billLink" href="https://vercel.com/muhris-ajs-projects/~/ai-gateway" target="_blank" rel="noopener noreferrer">↗ Official Vercel AI Gateway usage & billing</a><button type="button" class="mode" style="flex:0 0 auto;border:1px solid #ffffff24" id="balanceButton">Check official credits</button></div>
+<p class="notes">An operator token and configured AI Gateway access are required for model calls. Session totals reset when this page is reloaded. A $0 estimate is never presented as actual Vercel billing. The selected model provider account (Vercel or Groq) is the source of truth for billed charges, credits, and free-tier allowance.</p>
+<div class="topline"><a class="billLink" id="billingLink" href="https://vercel.com/muhris-ajs-projects/~/ai-gateway" target="_blank" rel="noopener noreferrer">↗ Official model provider usage & billing</a><button type="button" class="mode" style="flex:0 0 auto;border:1px solid #ffffff24" id="balanceButton">Check official credits</button></div>
 <p id="balance" class="notes"></p>
 </section>
 </div></main></div>
@@ -157,8 +157,18 @@ const data=await response.json();if(!response.ok)throw Error(data.detail||data.e
 showData(data,mode==="agents");setStatus("Completed · Original citations and limitations included.")}
 catch(e){setStatus(String(e.message||e),true)}
 finally{button.disabled=false}});
-async function checkConfig(){try{const r=await fetch("/api/agent-config");const data=await r.json();$("system").textContent=data.ai_enabled?"AI OPERATOR ONLINE":"SOURCE MODE ONLINE"}catch{$("system").textContent="CHECK SYSTEM STATUS"}}
-$("balanceButton").addEventListener("click",async()=>{const key=$("secret").value;if(!key){$("balance").textContent="Enter your operator token in Multi-agent AI mode first.";return}
+async function checkConfig(){try{
+const r=await fetch("/api/agent-config");const data=await r.json();
+$("system").textContent=data.ai_enabled?"AI OPERATOR ONLINE":"SOURCE MODE ONLINE";
+$("modelValue").textContent=data.model||"Not selected";
+if(typeof data.input_price_per_million==="number")$("inputRate").textContent="$"+data.input_price_per_million.toFixed(3)+" / 1M";
+if(typeof data.output_price_per_million==="number")$("outputRate").textContent="$"+data.output_price_per_million.toFixed(3)+" / 1M";
+const isGroq=String(data.provider).includes("Groq");
+$("billingLink").href=isGroq?"https://console.groq.com/settings/billing":"https://vercel.com/muhris-ajs-projects/~/ai-gateway";
+$("balanceButton").textContent=isGroq?"Open Groq billing":"Check Gateway credits";
+$("balanceButton").dataset.provider=isGroq?"groq":"gateway";
+}catch{$("system").textContent="CHECK SYSTEM STATUS"}}
+$("balanceButton").addEventListener("click",async()=>{if($("balanceButton").dataset.provider==="groq"){window.open("https://console.groq.com/settings/billing","_blank","noopener");return}const key=$("secret").value;if(!key){$("balance").textContent="Enter your operator token in Multi-agent AI mode first.";return}
 try{const res=await fetch("/api/credits",{headers:{"Authorization":"Bearer "+key}});const json=await res.json();if(!res.ok)throw Error(json.detail||"Credit request failed");$("balance").textContent="Gateway credit summary: "+JSON.stringify(json)+". Consult Vercel for official billed charges."}catch(err){$("balance").textContent="Official credit data unavailable: "+String(err.message||err)}});
 checkConfig();
 </script></body></html>''';
