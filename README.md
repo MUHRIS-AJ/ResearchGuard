@@ -19,7 +19,7 @@ A browser-based academic literature discovery and research-assistance applicatio
 
 ## Actual architecture
 
-\`\`\`text
+```text
 User / authenticated operator
           |
     ResearchGuard API
@@ -37,7 +37,7 @@ User / authenticated operator
    Auditable report + DOI links + per-agent token usage and price estimate
           |
        Human review
-\`\`\`
+```
 
 These agents are **separate model invocations**, orchestrated in a bounded and serial execution graph. They are not a continuously autonomous workforce: no external accounts are modified and no background tasks are executed. The Verification Agent checks overstatements against bibliographic metadata, **not scientific claim truth or full text**.
 
@@ -45,15 +45,15 @@ These agents are **separate model invocations**, orchestrated in a bounded and s
 
 - **Crossref:** https://api.crossref.org/works; real publication metadata, no default API key
 - **Free Dictionary API:** https://api.dictionaryapi.dev; academic English glossary, not scientific evidence
-- **FastMCP:** separate read-only \`find_research\`, \`inspect_doi\`, \`find_papers\`, and \`explain_english_term\` tools
+- **FastMCP:** separate read-only `find_research`, `inspect_doi`, `find_papers`, and `explain_english_term` tools
 - **FastAPI:** server-side API and polished responsive browser control room
-- **Model provider A:** Vercel AI Gateway, model \`google/gemini-2.5-flash-lite\`
-- **Model provider B:** **official Groq API**, model \`openai/gpt-oss-20b\` (free plan **subject to eligibility and rate limits**; never assume free)
+- **Model provider A:** Vercel AI Gateway, model `google/gemini-2.5-flash-lite`
+- **Model provider B:** **official Groq API**, model `openai/gpt-oss-20b` (free plan **subject to eligibility and rate limits**; never assume free)
 - All source URLs and model hosts are fixed by server code, never supplied by the public user.
 
 ## Setup (Python 3.11+)
 
-\`\`\`bash
+```bash
 python -m venv .venv
 # Activate your environment, then:
 pip install -r requirements.txt
@@ -61,7 +61,7 @@ python -m unittest discover -s tests -v
 python core.py "AI in education"
 python dashboard.py --port 8765  # Old local source-only viewer
 uvicorn app:app --host 127.0.0.1 --port 8000 # New dashboard
-\`\`\`
+```
 
 Open http://127.0.0.1:8000 for the full research console. **AI access remains disabled without environment configuration.**
 
@@ -69,23 +69,23 @@ Open http://127.0.0.1:8000 for the full research console. **AI access remains di
 
 Use provider-issued credentials in your hosting settings or a private, uncommitted environment. Do not paste keys into GitHub, ChatGPT, or a public issue:
 
-\`\`\`dotenv
+```dotenv
 AI_LLM_PROVIDER=groq
 GROQ_API_KEY=<set privately in your host>
 AGENT_ACCESS_TOKEN=<owner-generated long random secret; at least 24 characters>
 AI_AGENT_ENABLED=1
-\`\`\`
+```
 
-The operator enters only the \`AGENT_ACCESS_TOKEN\` into the console. The real Groq key stays server-side. If Groq free usage is exhausted or your account requires billing, the provider returns an error; the application does not attempt to bypass quotas. **Use Groq's official dashboard for actual usage and charges.**
+The operator enters only the `AGENT_ACCESS_TOKEN` into the console. The real Groq key stays server-side. If Groq free usage is exhausted or your account requires billing, the provider returns an error; the application does not attempt to bypass quotas. **Use Groq's official dashboard for actual usage and charges.**
 
 ### Enable Vercel AI Gateway instead
 
-\`\`\`dotenv
+```dotenv
 AI_LLM_PROVIDER=gateway
 AI_GATEWAY_API_KEY=<set privately; alternatively use platform-provided VERCEL_OIDC_TOKEN>
 AGENT_ACCESS_TOKEN=<owner-generated long random secret; at least 24 characters>
 AI_AGENT_ENABLED=1
-\`\`\`
+```
 
 Vercel's AI Gateway may require billing verification, credits, and suitable spend limits before model requests work. We do **not** enable payments or create provider keys for the user. Configure a provider-level budget before turning on paid mode.
 
@@ -107,18 +107,18 @@ No permanent usage database, generated tax invoice, team-wide spend limits, paym
 
 ### MCP access
 
-\`\`\`bash
+```bash
 python server.py
-\`\`\`
+```
 
 The default is local stdio, suitable for explicitly configured MCP clients. Don't expose unauthenticated FastMCP tools to the public internet. For registry and security guidance consult https://modelcontextprotocol.io/ and https://github.com/modelcontextprotocol/servers; reference examples are **not automatically production hardened**.
 
 ### Verification
 
-\`\`\`bash
+```bash
 python -m compileall -q .
 python -m unittest discover -s tests -v
-\`\`\`
+```
 
 Tests mock source/provider responses to verify orchestration, price arithmetic and failure behavior. They are **not** proof that an actual account can call the selected model. To complete genuine LLM live testing, the repository owner must configure a legitimate provider account/key and private operator token.
 
