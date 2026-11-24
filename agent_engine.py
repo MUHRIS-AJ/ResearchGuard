@@ -14,10 +14,21 @@ from core import discover
 from transport import SourceError
 
 GATEWAY = "https://ai-gateway.vercel.sh/v1"
+GROQ_BASE = "https://api.groq.com/openai/v1"
 MODEL = "google/gemini-2.5-flash-lite"
-# Published Vercel AI Gateway catalog on 2026-11-24, USD per token, standard tier.
-INPUT_PRICE = 0.00000010
-OUTPUT_PRICE = 0.00000040
+GROQ_MODEL = "openai/gpt-oss-20b"
+# Published standard-rate reference, USD per token; NOT the actual bill or free-tier charge.
+GATEWAY_PRICES = (0.00000010, 0.00000040)
+GROQ_PRICES = (0.000000075, 0.00000030)
+
+def provider() -> str:
+    """Provider selection is fixed server-side, never supplied by an unauthenticated request."""
+    return "groq" if os.environ.get("AI_LLM_PROVIDER", "gateway").lower() == "groq" else "gateway"
+
+def selection() -> tuple[str, str, tuple[float, float]]:
+    if provider() == "groq":
+        return ("Groq official API", GROQ_MODEL, GROQ_PRICES)
+    return ("Vercel AI Gateway", MODEL, GATEWAY_PRICES)
 MAX_RUN_ESTIMATE_USD = 0.01
 MAX_STEPS = 3
 
@@ -25,23 +36,25 @@ class AgentError(Exception):
     pass
 
 def configured() -> bool:
-    return bool(os.environ.get("AI_AGENT_ENABLED") == "1" and
-                os.environ.get("AGENT_ACCESS_TOKEN") and
-                (os.environ.get("AI_GATEWAY_API_KEY") or os.environ.get("VERCEL_OIDC_TOKEN")))
+    token = os.environ.get("AGENT_ACCESS_TOKEN", "")
+    key = (os.environ.get("GROQ_API_KEY") if provider() == "groq" else
+           (os.environ.get("AI_GATEWAY_API_KEY") or os.environ.get("VERCEL_OIDC_TOKEN")))
+    return bool(os.environ.get("AI_AGENT_ENABLED") == "1" and len(token) >= 24 and key)
 
-def _gateway_key():
-    return os.environ.get("AI_GATEWAY_API_KEY") or os.environ.get("VERCEL_OIDC_TOKEN")
+def _provider_key():
+    return (os.environ.get("GROQ_API_KEY") if provider() == "groq" else
+            (os.environ.get("AI_GATEWAY_API_KEY") or os.environ.get("VERCEL_OIDC_TOKEN")))
 
 def _request(path: str, payload: dict | None = None):
-    key = _gateway_key()
+    key = _provider_key()
     if not key:
-        raise AgentError("No Vercel Gateway credential. Configure OIDC or an AI Gateway API key.")
+        raise AgentError("Selected AI provider is not configured. Set the official provider key in Vercel environment variables.")
     headers = {"Authorization": "Bearer " + key, "Accept": "application/json"}
     if payload is not None:
         headers["Content-Type"] = "application/json"
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8") if payload is not None else None
     try:
-        req = Request(GATEWAY + path, headers=headers, data=data,
+        req = Request((GROQ_BASE if provider() == "groq" else GATEWAY) + path, headers=headers, data=data,
                       method="POST" if data is not None else "GET")
         with urlopen(req, timeout=24) as res:
             raw = res.read(250_001)
@@ -72,8 +85,9 @@ class AgentStep:
 
 def _chat(agent: str, policy: str, prompt: str, max_tokens: int) -> AgentStep:
     started = time.monotonic()
+    _, model, (input_price, output_price) = selection()
     payload = {
-        "model": MODEL,
+        "model": model,
         "messages": [
             {"role": "system", "content": policy},
             {"role": "user", "content": prompt[:9000]}
@@ -93,7 +107,7 @@ def _chat(agent: str, policy: str, prompt: str, max_tokens: int) -> AgentStep:
     out = usage.get("completion_tokens")
     verified = isinstance(inp, int) and isinstance(out, int)
     # Unknown usage must never be represented as an actual provider token count.
-    estimate = round((inp * INPUT_PRICE + out * OUTPUT_PRICE), 8) if verified else None
+    estimate = round((inp * input_price + out * output_price), 8) if verified else None
     return AgentStep(
         agent=agent, task=policy.split(".")[0][:110], output=content[:5000],
         input_tokens=inp if verified else -1,
@@ -150,7 +164,8 @@ def orchestrate(topic: str) -> dict:
                      "\nIndependent audit:\n"+steps[1].output[:1800]+
                      "\nWrite final clear evidence memo with cited DOIs and caveats (max 180 words)."
         # Worst-case token reserve check; estimate includes capped output and capped prompt.
-        cap = (len(prompt)//3 + 300) * INPUT_PRICE + 360*OUTPUT_PRICE
+        _, _, (input_price, output_price) = selection()
+        cap = (len(prompt)//3 + 300) * input_price + 360*output_price
         if used + cap > MAX_RUN_ESTIMATE_USD:
             raise AgentError("Per-run estimated spending guardrail reached; no further AI calls.")
         step = _chat(agent, policy, prompt, max_tokens=360)
@@ -165,14 +180,15 @@ def orchestrate(topic: str) -> dict:
         "sources":papers, "stages":[asdict(step) for step in steps],
         "report":steps[-1].output,
         "billing":{
-            "provider":"Vercel AI Gateway", "model":MODEL,
+            "provider":selection()[0], "model":selection()[1],
             "requests":len(steps),
             "input_tokens":sum(s.input_tokens for s in steps),
             "output_tokens":sum(s.output_tokens for s in steps),
             "estimated_usd":round(sum(s.estimated_usd for s in steps),8),
             "max_run_estimated_usd":MAX_RUN_ESTIMATE_USD,
             "pricing_as_of":"2026-11-24",
-            "actual_provider_invoice":"Not an invoice; check your Vercel AI Gateway Billing and Logs."
+            "actual_provider_invoice":"Not an invoice. Official billing and free-tier allowances are managed by the selected provider.",
+            "free_tier_note":"Free-plan quota, if eligible, can reduce actual charges to zero; quota and eligibility are not verified by this application."
         },
         "limitations":[
             "Crossref metadata proves neither article conclusions nor research claim correctness.",
@@ -186,6 +202,8 @@ def credit_balance():
     """Official balance from Vercel AI Gateway; no model generation and no local estimates."""
     if not configured():
         raise AgentError("AI Gateway operator mode is not enabled.")
+    if provider() == "groq":
+        raise AgentError("Groq account credits are not exposed through the Vercel credits endpoint. Open the official Groq Console for usage and billing.")
     obj = _request("/credits")
     # Do not invent keys; return only non-secret billing aggregate fields.
     return {k:v for k,v in obj.items() if k in {
