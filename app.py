@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from core import SERVICES, run
 from transport import SourceError
 from agent_console import CONSOLE_HTML
-from agent_engine import AgentError, orchestrate, configured, credit_balance, MODEL
+from agent_engine import AgentError, orchestrate, configured, credit_balance, selection
 
 app = FastAPI(
     title="MUHRIS ResearchGuard — Multi-agent Evidence Studio",
@@ -43,9 +43,12 @@ def health():
 
 @app.get("/api/agent-config")
 def agent_config():
-    return {"ai_enabled":configured(), "model":MODEL, "public_data":True,
-            "requires_operator_token":True,"charges_from_public_requests":False,
-            "estimate_only":True}
+    name, model, (input_price, output_price) = selection()
+    return {"ai_enabled":configured(), "model":model, "provider":name,
+            "input_price_per_million":round(input_price * 1_000_000, 4),
+            "output_price_per_million":round(output_price * 1_000_000, 4),
+            "public_data":True, "requires_operator_token":True,
+            "charges_from_public_requests":False, "estimate_only":True}
 
 @app.get("/api")
 def api(query: str = Query(min_length=2,max_length=120), service: str = ""):
