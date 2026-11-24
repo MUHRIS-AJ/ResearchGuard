@@ -12,7 +12,7 @@ ALLOWED_HOSTS = frozenset({
     "api.ted.europa.eu", "api.grants.gov",
     "overpass-api.de", "overpass.private.coffee",
     "api.fda.gov", "www.saferproducts.gov",
-    "api.worldbank.org"
+    "api.worldbank.org", "api.dictionaryapi.dev"
 })
 
 class SourceError(Exception):
