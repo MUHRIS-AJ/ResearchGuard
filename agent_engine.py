@@ -157,12 +157,12 @@ def orchestrate(topic: str) -> dict:
     used = 0.0
     for i, (agent, policy, prompt) in enumerate(agents):
         if i == 1:
-            prompt = "Topic: "+topic+"\nMetadata:\n"+sources+"\nAnalyst output:\n"+steps[0].output[:3200]+
-                     "\nAudit this output. List unsupported inferences and safe corrections (max 110 words)."
+            prompt = ("Topic: "+topic+"\nMetadata:\n"+sources+"\nAnalyst output:\n"+steps[0].output[:3200]+
+                      "\nAudit this output. List unsupported inferences and safe corrections (max 110 words).")
         elif i == 2:
-            prompt = "Topic: "+topic+"\nMetadata:\n"+sources+"\nAnalyst:\n"+steps[0].output[:2200]+
-                     "\nIndependent audit:\n"+steps[1].output[:1800]+
-                     "\nWrite final clear evidence memo with cited DOIs and caveats (max 180 words)."
+            prompt = ("Topic: "+topic+"\nMetadata:\n"+sources+"\nAnalyst:\n"+steps[0].output[:2200]+
+                      "\nIndependent audit:\n"+steps[1].output[:1800]+
+                      "\nWrite final clear evidence memo with cited DOIs and caveats (max 180 words).")
         # Worst-case token reserve check; estimate includes capped output and capped prompt.
         _, _, (input_price, output_price) = selection()
         cap = (len(prompt)//3 + 300) * input_price + 360*output_price
