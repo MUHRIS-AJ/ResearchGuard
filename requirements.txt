@@ -1,2 +1,3 @@
 # Optional MCP tool hosting. CLI and local browser dashboard use only Python standard library.
 fastmcp>=3,<5
+fastapi>=0.118,<1
